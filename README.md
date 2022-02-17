@@ -10,7 +10,8 @@ I find that when training a transformer, the embedding matrix moves slowly, henc
 ```
 So I propose initializing the embedding matrix to tiny values, and put another LayerNorm after it (before all the SA & FFN layers):
 ```
-nn.init.uniform_(module.weight, a=-1e-4, b=1e-4) # SmallInit(Emb)
+if isinstance(module, (nn.Embedding)):
+    nn.init.uniform_(module.weight, a=-1e-4, b=1e-4) # SmallInit(Emb)
 ...
 if self.config.USE_SMALL_EMB and self.layer_id == 0:
     x = self.lnPre(x) # LN(SmallInit(Emb))
@@ -25,7 +26,8 @@ Loss curve comparison: https://wandb.ai/blinkdl/SmallEmbTest
 
 # Moreover, you can directly train PostLN models without warmup with SmallInit(Emb)
 ```
-nn.init.uniform_(module.weight, a=-1e-4, b=1e-4) # SmallInit(Emb)
+if isinstance(module, (nn.Embedding)):
+    nn.init.uniform_(module.weight, a=-1e-4, b=1e-4) # SmallInit(Emb)
 ...
 x = self.ln1(x) # this plays the same role as the lnPre in the above PreLN code
 x = x + self.att(x)
