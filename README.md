@@ -4,7 +4,7 @@ LayerNorm(SmallInit(Embedding)) in a Transformer
 I find that when training a transformer, the embedding matrix moves slowly, hence it's difficult for the model to jump out of the initial noisy embedding.
 ```
 (initial embedding)
-[-0.0073  0.0062 -0.0261 ...  0.0086  0.0107 -0.008 ] ... ]
+[[-0.0073  0.0062 -0.0261 ...  0.0086  0.0107 -0.008 ] ... ]
  (after 1 step, the directions of the embedding vectors are not moved much because the numbers change by ~LR = ~4e-4)
 [[-0.0069  0.0066 -0.0265 ...  0.009   0.0111 -0.0084] ... ]
 ```
