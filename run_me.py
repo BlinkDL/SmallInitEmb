@@ -19,14 +19,16 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s - %(name)s - %(message)s
 
 USE_SMALL_EMB = True # <-------- The LN(SmallInit(Emb)) trick
 
-ctx_len = 512
+USE_FP16 = False    # Mixed Precision?
+GRAD_ACCUM = 1      # Gradient accumulation? 1 = disable
+batch_size = 16
+
+ctx_len = 256
 n_layer = 6
 n_head = 8
 n_embd = n_head * 64
 n_attn = n_embd
 n_ffn = n_embd
-
-batch_size = 8 # batch_size = 8 for 8G VRAM (the emb matrix for BPE enwiki8 is huge!)
 
 lr_init = 4e-4
 lr_final = 4e-5
@@ -88,10 +90,11 @@ train_dataset = Dataset(open(datafile, "r", encoding=datafile_encoding).read(), 
 ########################################################################################################
 if __name__ == '__main__':
 
-    model = GPT(GPTConfig(train_dataset.vocab_size, train_dataset.ctx_len, n_layer=n_layer, n_head=n_head, n_embd=n_embd, n_attn=n_attn, n_ffn=n_ffn, USE_SMALL_EMB=USE_SMALL_EMB)).cuda()
+    model = GPT(GPTConfig(train_dataset.vocab_size, train_dataset.ctx_len, n_layer=n_layer, n_head=n_head, n_embd=n_embd, n_attn=n_attn, n_ffn=n_ffn
+    , USE_SMALL_EMB=USE_SMALL_EMB)).cuda()
 
     print('epoch', n_epoch, 'batchsz', batch_size, 'betas', betas, 'eps', eps, 'wd', weight_decay, 'ctx', ctx_len, 'layer', n_layer, 'head', n_head, 'embd', n_embd, 'attn', n_attn, 'ffn', n_ffn)
-    tconf = TrainerConfig(max_epochs=n_epoch, batch_size=batch_size, weight_decay=weight_decay,
+    tconf = TrainerConfig(max_epochs=n_epoch, batch_size=batch_size, weight_decay=weight_decay, USE_FP16=USE_FP16, GRAD_ACCUM=GRAD_ACCUM,
                             learning_rate=lr_init, lr_decay=True, lr_final=lr_final, betas=betas, eps=eps, grad_norm_clip=grad_norm_clip,
                             final_tokens=n_epoch*len(train_dataset)*ctx_len, epoch_save_frequency=epoch_save_frequency, epoch_save_path=epoch_save_path)
     trainer = Trainer(model, train_dataset, None, tconf)
