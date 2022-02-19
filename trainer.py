@@ -87,6 +87,8 @@ class Trainer:
                     if self.config.GRAD_ACCUM > 1:
                         loss = loss / self.config.GRAD_ACCUM
                         self.now_loss += loss.item()
+                    else:
+                        self.now_loss = loss.item()
                     scaler.scale(loss).backward()
 
                     if (self.steps + 1) % self.config.GRAD_ACCUM == 0:
@@ -116,7 +118,7 @@ class Trainer:
                         if self.avg_loss < 0:
                             self.avg_loss = self.now_loss
                         else:
-                            factor = 1 / (it / self.config.GRAD_ACCUM + 1)
+                            factor = 1 / (it // self.config.GRAD_ACCUM + 1)
                             self.avg_loss = self.avg_loss * (1.0 - factor) + self.now_loss * factor
                         pbar.set_description(f"epoch {epoch+1} prog {progress*100.0:.2f}% iter {it}: ppl {math.exp(self.avg_loss):.2f} loss {self.avg_loss:.4f} lr {lr:e}")
                         self.now_loss = 0
