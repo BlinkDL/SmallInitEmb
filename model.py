@@ -37,6 +37,7 @@ def apply_rotary_pos_emb(q, k, cos, sin):
 class MHA(nn.Module):
     def __init__(self, config):
         super().__init__()
+        self.config = config
         assert config.n_attn % config.n_head == 0
         self.n_head = config.n_head
         self.ctx_len = config.ctx_len
@@ -47,8 +48,9 @@ class MHA(nn.Module):
         self.value = nn.Linear(config.n_embd, config.n_attn)
         self.register_buffer("mask", torch.tril(torch.ones(config.ctx_len, config.ctx_len)))
 
-        self.rotary_ndims = int(self.head_size * 0.5)
-        self.rotary_emb = RotaryEmbedding(self.rotary_ndims)
+        if self.config.ROTARY_POS_EMB:
+            self.rotary_ndims = int(self.head_size * 0.5)
+            self.rotary_emb = RotaryEmbedding(self.rotary_ndims)
 
         self.output = nn.Linear(config.n_attn, config.n_embd)
 
@@ -59,12 +61,13 @@ class MHA(nn.Module):
         k = self.key(x).view(B, T, self.n_head, self.head_size).transpose(1, 2)         # (B, T, C) -> (B, nh, T, hs)
         v = self.value(x).view(B, T, self.n_head, self.head_size).transpose(1, 2)       # (B, T, C) -> (B, nh, T, hs)
 
-        q, query_pass = q[..., :self.rotary_ndims], q[..., self.rotary_ndims:]
-        k, key_pass = k[..., :self.rotary_ndims], k[..., self.rotary_ndims:]
-        cos, sin = self.rotary_emb(q, seq_len=T)
-        q, k = apply_rotary_pos_emb(q, k, cos, sin)                                     # rotary encoding
-        q = torch.cat((q, query_pass), dim=-1)
-        k = torch.cat((k, key_pass), dim=-1)
+        if self.config.ROTARY_POS_EMB:
+            q, query_pass = q[..., :self.rotary_ndims], q[..., self.rotary_ndims:]
+            k, key_pass = k[..., :self.rotary_ndims], k[..., self.rotary_ndims:]
+            cos, sin = self.rotary_emb(q, seq_len=T)
+            q, k = apply_rotary_pos_emb(q, k, cos, sin)                                     # rotary encoding
+            q = torch.cat((q, query_pass), dim=-1)
+            k = torch.cat((k, key_pass), dim=-1)
         
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))                 # self-attention: (B, nh, T, hs) * (B, nh, hs, T) -> (B, nh, T, T)
         att = att.masked_fill(self.mask[:T,:T] == 0, float('-inf'))                     # causal mask
@@ -139,6 +142,9 @@ class GPT(nn.Module):
         self.ctx_len = config.ctx_len
 
         self.emb = nn.Embedding(config.vocab_size, config.n_embd)
+        if not self.config.ROTARY_POS_EMB:
+            self.pos_emb = nn.Parameter(torch.zeros(1, config.ctx_len, config.n_embd)) # note: i initialize abs.pos.emb to zero
+
         self.blocks = nn.Sequential(*[Block(config, i) for i in range(config.n_layer)])
         self.ln_out = nn.LayerNorm(config.n_embd)
         self.head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
@@ -168,7 +174,7 @@ class GPT(nn.Module):
         for mn, m in self.named_modules():
             for pn, p in m.named_parameters():
                 fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
-                if pn.endswith('bias') or ('time' in fpn) or ('head' in fpn) or ('scale' in fpn):
+                if pn.endswith('bias') or ('time' in fpn) or ('head' in fpn) or ('scale' in fpn) or ('pos_emb' in fpn):
                     no_decay.add(fpn)
                 elif pn.endswith('weight') and isinstance(m, whitelist_weight_modules):
                     decay.add(fpn)
@@ -192,6 +198,8 @@ class GPT(nn.Module):
         assert T <= self.ctx_len, "Cannot forward, because len(input) > model ctx_len."
 
         x = self.emb(idx)
+        if not self.config.ROTARY_POS_EMB:
+            x = x + self.pos_emb[:, :T, :]
 
         x = self.blocks(x)
 
