@@ -20,11 +20,16 @@ x = x + self.ffn(self.ln2(x))
 ```
 And then you get improved convergence (especially for BPE models) because the model can quickly jump out of the tiny initial embedding (small changes after 1 step -> significant changes of directions -> significant changes after LayerNorm).
 
+* **NOTE: LN(SmallInitEmb) works the best with rotary or alibi pos.encoding. If you are using abs.pos.emb then it shall be initialized to ZERO.**
+```
+self.pos_emb = nn.Parameter(torch.zeros(1, config.ctx_len, config.n_embd))
+```
+
 Loss curve comparison: https://wandb.ai/blinkdl/SmallEmbTest
 
 (the gap between LayerNorm(SmallEmb)) and baseline persists after more training)
 
-# Moreover, you can directly train PostLN models without warmup with SmallInit(Emb)
+## Moreover, you can directly train PostLN models without warmup with LN(SmallInitEmb)
 ```
 if isinstance(module, (nn.Embedding)):
     nn.init.uniform_(module.weight, a=-1e-4, b=1e-4) # SmallInit(Emb)
