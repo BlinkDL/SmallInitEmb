@@ -108,7 +108,7 @@ class Block(nn.Module):
         self.config = config
         self.layer_id = layer_id
 
-        if self.config.USE_SMALL_EMB and self.layer_id == 0: # LN(SmallInit(Emb))
+        if (not self.config.USE_POST_LN) and (self.config.USE_SMALL_EMB) and (self.layer_id == 0): # LN(SmallInit(Emb))
             self.lnPre = nn.LayerNorm(config.n_embd)
         
         self.ln1 = nn.LayerNorm(config.n_embd)
@@ -118,11 +118,17 @@ class Block(nn.Module):
         self.ffn = GeGLU(config)
 
     def forward(self, x):
-        if self.config.USE_SMALL_EMB and self.layer_id == 0: # LN(SmallInit(Emb))
-            x = self.lnPre(x)
+        if self.config.USE_POST_LN:
+            x = self.ln1(x)
+            x = x + self.att(x)
+            x = self.ln2(x)
+            x = x + self.ffn(x)
+        else:
+            if self.config.USE_SMALL_EMB and self.layer_id == 0: # LN(SmallInit(Emb))
+                x = self.lnPre(x)
 
-        x = x + self.att(self.ln1(x))
-        x = x + self.ffn(self.ln2(x))
+            x = x + self.att(self.ln1(x))
+            x = x + self.ffn(self.ln2(x))
         
         return x
 

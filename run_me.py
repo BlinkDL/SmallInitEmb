@@ -18,12 +18,13 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s - %(name)s - %(message)s
 ########################################################################################################
 
 USE_SMALL_EMB = True # <-------- The LN(SmallInit(Emb)) trick
+USE_POST_LN = False  # PostLN is stable if you enable USE_SMALL_EMB
 
 USE_FP16 = False    # Mixed Precision?
 GRAD_ACCUM = 1      # Gradient accumulation? 1 = disable
-batch_size = 16
+batch_size = 8
 
-ctx_len = 256
+ctx_len = 512
 n_layer = 6
 n_head = 8
 n_embd = n_head * 64
@@ -90,8 +91,8 @@ train_dataset = Dataset(open(datafile, "r", encoding=datafile_encoding).read(), 
 ########################################################################################################
 if __name__ == '__main__':
 
-    model = GPT(GPTConfig(train_dataset.vocab_size, train_dataset.ctx_len, n_layer=n_layer, n_head=n_head, n_embd=n_embd, n_attn=n_attn, n_ffn=n_ffn
-    , USE_SMALL_EMB=USE_SMALL_EMB)).cuda()
+    model = GPT(GPTConfig(train_dataset.vocab_size, train_dataset.ctx_len, n_layer=n_layer, n_head=n_head, n_embd=n_embd, n_attn=n_attn, n_ffn=n_ffn,
+        USE_SMALL_EMB=USE_SMALL_EMB, USE_POST_LN=USE_POST_LN)).cuda()
 
     print('epoch', n_epoch, 'batchsz', batch_size, 'betas', betas, 'eps', eps, 'wd', weight_decay, 'ctx', ctx_len, 'layer', n_layer, 'head', n_head, 'embd', n_embd, 'attn', n_attn, 'ffn', n_ffn)
     tconf = TrainerConfig(max_epochs=n_epoch, batch_size=batch_size, weight_decay=weight_decay, USE_FP16=USE_FP16, GRAD_ACCUM=GRAD_ACCUM,
